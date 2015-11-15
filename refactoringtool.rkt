@@ -80,16 +80,11 @@
               (parameterize ([current-eventspace drs-eventspace])
                 (queue-callback
                  (λ ()
-                   ;(send the-tab syncheck:clear-highlighting)
                    (cleanup)
                    (custodian-shutdown-all user-custodian)))))))
       (define settings (send definitions-text get-next-settings))
       (displayln "Help")
       ((λ ()
-         ;(send the-tab clear-annotations)
-         ;(send the-tab reset-offer-kill)
-         ;(send the-tab syncheck:clear-highlighting)
-         ;(send (send the-tab get-defs) syncheck:init-arrows)
          ((drracket:eval:traverse-program/multiple
            #:gui-modules? #f
            settings
@@ -99,13 +94,10 @@
                                            0
                                            (send text last-position))
           (λ (sexp loop) ;this is the "iter"
-            ;(void) "syntax-parse-tests.rkt:1:0: read: #lang not enabled in the current context" + close-status-line: status line not open 'drracket:check-syntax:status
             (cond
               [(eof-object? sexp)
                (custodian-shutdown-all user-custodian)]
-              ;(custodian-shutdown-all user-custodian)]
               [else
-               ;(open-status-line 'drracket:check-syntax:status)
                (displayln sexp)
                (set! not-expanded-program sexp)
                (displayln not-expanded-program)
@@ -119,24 +111,13 @@
       (display "Position-location ")
       (send text position-location start-selection #f start-box #t #f #f);Check this!
       (send text position-location end-selection #f end-box #t #f #f);Check this!
-      
-      (displayln (unbox start-box))
-      
-      (displayln (unbox end-box))
-      
       (define start-line (send text find-line (unbox start-box)))
       (define end-line (send text find-line (unbox end-box)))
-      
-      (syntax-refactoring void text start-selection end-selection start-line end-line void)
-      )
-    (define (syntax-refactoring parent text start-selection end-selection start-line end-line binding-aux)
+      (syntax-refactoring text start-selection end-selection start-line end-line))
+    
+    (define (syntax-refactoring text start-selection end-selection start-line end-line)
       (define arg null)
       ;; syntax says it's line 2 when here it says 0. adjustment is start-line +2 and end-line +2.
-      (display "Start-Selection ")
-      (display start-line)
-      (display " end-selection ") 
-      (displayln end-line)
-      
       (define (write-back aux-stx)
         (displayln "WRINTING")
         (parameterize ((print-as-expression #f)
@@ -159,58 +140,19 @@
             #;(for ([txt (in-list edit-sequence-txts)])
                 (send txt end-edit-sequence))))
       
-      #;(syntax-parse (car arg)
+      #;(syntax-parse (car arg) ;used for the exapanded program
           #:literals(if)
           [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
-           (when #t (equal? (syntax->datum #'(then-expr)) (not (syntax->datum #'else-expr)))
+           (when (equal? (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
              (write-back (format "~.a" (syntax->datum #'(not test-expr)))))])
-      
-      
-      (print-syntax-width 2000)
-      (displayln not-expanded-program)
-      (displayln (syntax-e not-expanded-program))
       (set! arg (code-walker-non-expanded not-expanded-program (+ 1 start-line) (+ 1 end-line)))
-      #;(code-walker expanded-program (+ 1 start-line) (+ 1 end-line))
       (displayln arg)
       ;;; require for template
-      #;(syntax-parse arg
+     (syntax-parse arg
         ;#:literals ((if if #:phase 2))
         ;#:datum-literals (if)
         #:literals (if)
-        [(if test-expr then-expr else-expr) (syntax->datum #'(not test-expr))])
-      
-      
-      ;;Used format "~.a" to transform into a string, find a better way
-      (syntax-parse arg
-        #:datum-literals (cons if not > <= >= < and lambda map length list) ;; is lst a datum literal??
-        ;#:literals ((>= >= #:phase 0 not #:phase 0iteral > #:phase 0) (~literal < #:phase 0) (~literal <= #:phase 0)  )
-        [(not (> a b))
-         (write-back #'(<= a b))]
-        [(not (<= a b))
-         (write-back #'(> a b))]
-        [(not (< a b))
-         (write-back #'(>= a b))]
-        [(not (>= a b))
-         (write-back #'(< a b))]
-        [(if test-expr then-expr else-expr)
-         (begin
-           (when (and #t (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
-             (write-back #'(not test-expr)))
-           (when (and #t (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
-             (write-back #'test-expr)))]
-        [(and (< x y) (< v z))
-         (when (equal? (syntax->datum #'y) (syntax->datum #'v))
-           (write-back #'(< x y z)))]
-        [(and (> x y) (> v z))
-         (when (equal? (syntax->datum #'y) (syntax->datum #'v))
-           (write-back #'(> x y z)))]
-        [(cons x (list y v ...))
-         (write-back #'(list x y v ...))]
-        [(= (length l) 0) (write-back #'(null? l))]
-        ;[(= (length l) 1) (write-back #'(singleton? l))] this does not exist?
-        ;[(cons x (list y ... v)) (write-back #'(list x y ... v))]
-        [(ft (lambda (arg-aux) (ftn arg-aux2)) arg)  #:when (eq? (syntax-e #'arg-aux) (syntax-e #'arg-aux2)) (write-back #'(ft ftn arg))]
-        [((lambda (arg-aux) (function arg-aux2)) arg)  #:when (eq? (syntax-e #'arg-aux) (syntax-e #'arg-aux2)) (write-back #'(function art))]))
+        [(if test-expr then-expr else-expr) (syntax->datum #'(not test-expr))]))  
     (define (phase1) (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
