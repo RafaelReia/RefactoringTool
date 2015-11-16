@@ -51,7 +51,6 @@
         bmp))
     
     (define (refactoring-syntax text tab)
-      ;(message-box "Plugin Test" "         Working       ")
       (define definitions-text-copy 
         (new (class text:basic%
                ;; overriding get-port-name like this ensures
@@ -83,7 +82,6 @@
                    (cleanup)
                    (custodian-shutdown-all user-custodian)))))))
       (define settings (send definitions-text get-next-settings))
-      (displayln "Help")
       ((λ ()
          ((drracket:eval:traverse-program/multiple
            #:gui-modules? #f
@@ -108,7 +106,6 @@
       ;;find-line uses location, not position. must convert before!
       (define start-box (box 1))
       (define end-box (box 1))
-      (display "Position-location ")
       (send text position-location start-selection #f start-box #t #f #f);Check this!
       (send text position-location end-selection #f end-box #t #f #f);Check this!
       (define start-line (send text find-line (unbox start-box)))
@@ -122,23 +119,9 @@
         (displayln "WRINTING")
         (parameterize ((print-as-expression #f)
                        (pretty-print-columns 80))
-          (displayln (pretty-format (syntax->datum aux-stx))))
-        #;(let ([edit-sequence-txts null])
-            ;(displayln call)
-            ;;start editiing
-            #;(begin-edit-sequence)
-            ;(displayln "begin")
-            #;(send text begin-edit-sequence)
-            #;(set! edit-sequence-txts (cons text edit-sequence-txts))
-            ;;Delete the text
-            #;(send text delete start-selection end-selection)
-            ;;write call
-            #;(parameterize ((print-as-expression #f)
-                             (pretty-print-columns 80))
-                (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same))
-            ;; end Editing
-            #;(for ([txt (in-list edit-sequence-txts)])
-                (send txt end-edit-sequence))))
+          (send text delete start-selection end-selection)
+          (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
+          (displayln (pretty-format (syntax->datum aux-stx)))))
       
       #;(syntax-parse (car arg) ;used for the exapanded program
           #:literals(if)
@@ -147,12 +130,11 @@
              (write-back (format "~.a" (syntax->datum #'(not test-expr)))))])
       (set! arg (code-walker-non-expanded not-expanded-program (+ 1 start-line) (+ 1 end-line)))
       (displayln arg)
-      ;;; require for template
-     (syntax-parse arg
+      (syntax-parse arg
         ;#:literals ((if if #:phase 2))
         ;#:datum-literals (if)
-        #:literals (if)
-        [(if test-expr then-expr else-expr) (syntax->datum #'(not test-expr))]))  
+        #:datum-literals (if)
+        [(if test-expr then-expr else-expr) (write-back #'(not test-expr))]))  
     (define (phase1) (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
