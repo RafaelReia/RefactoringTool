@@ -183,7 +183,8 @@
     #:literals(if)
     [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
      (when #t (equal? (syntax->datum #'(then-expr)) (not (syntax->datum #'else-expr)))
-       (displayln (format "~.a" (syntax->datum #'(not test-expr)))))]))
+       (displayln (format "~.a" (syntax->datum #'(not test-expr)))))])
+  (car result))
 
 (define (code-walker-non-expanded code start end)
   (set! start-line start)
