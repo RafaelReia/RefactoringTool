@@ -58,7 +58,6 @@
         (define current-syncheck-running-mode #f)
         
         (define (refactoring-syntax text tab interactions #:print-extra-info? [print-extra-info? #f])
-          
           #;(open-status-line 'drracket:check-syntax:status) ;status line is inherith from somewhere and ensure-rep-hidden
           #;(update-status-line 'drracket:check-syntax:status status-init)
           #;(ensure-rep-hidden)
@@ -150,7 +149,7 @@
               #;(error-display-handler 
                (λ (msg exn) ;; =user=
                  (parameterize ([current-eventspace drs-eventspace])
-                   (queue-callback
+                   #;(queue-callback
                     (λ () ;; =drs=
                       
                       ;; this has to come first or else the positioning
@@ -184,30 +183,15 @@
                                            (current-directory)
                                            print-extra-info?)) ;; set by set-directory above
               (set! user-custodian (current-custodian))))
-          #;(define init-proc
-              (λ () 
-                (set! user-custodian (current-custodian)) 
-                (displayln "init done")))
-          #;(define kill-termination
-              (λ () 
-                (set! user-custodian (current-custodian)) 
-                (displayln "kill termination"))
-              #;(λ ()
-                  (unless normal-termination?
-                    (parameterize ([current-eventspace drs-eventspace])
-                      (queue-callback
-                       (λ ()
-                         (cleanup)
-                         (custodian-shutdown-all user-custodian)))))))
-          (displayln "$$$$$$$$$$$$$")
           (define settings (send definitions-text get-next-settings))
           (displayln "expand")
           (define module-language?
             (is-a? (drracket:language-configuration:language-settings-language settings)
                    drracket:module-language:module-language<%>))
-          (with-lock/edit-sequence
-           text
-           (λ ()
+          #;(begin
+            ;with-lock/edit-sequence
+           ;text
+           ((λ ()
              (drracket:eval:expand-program
               #:gui-modules? #f
               (drracket:language:make-text/pos text
@@ -242,8 +226,10 @@
                      ;(update-status-line 'drracket:check-syntax:status status-eval-compile-time)
                      (eval-compile-time-part-of-top-level sexp))
                    (parameterize ([current-eventspace drs-eventspace])
-                     (queue-callback
-                      (λ () ; =drs=
+                     (begin 
+                       ;queue-callback
+                      (begin
+                        ;λ () ; =drs=
                         (with-lock/edit-sequence
                          definitions-text
                          (λ ()
@@ -253,20 +239,20 @@
                            (parameterize ([current-annotations definitions-text])
                              (begin
                                ;(displayln "TEST")
-                               (print-syntax-width 1000) 
-                               (displayln sexp) ;;;; FOUND IT!
+                               #;(print-syntax-width 1000) 
+                               #;(displayln sexp) ;;;; FOUND IT!
                                (set! expanded-program sexp)
                                (expanded-expression sexp)))
                            #;(close-status-line 'drracket:check-syntax:status))))))
                    ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
                    ;(close-status-line 'drracket:check-syntax:status)
-                   (loop)])))))
+                   (loop)]))))))
           ((λ ()
              ((drracket:eval:traverse-program/multiple
                #:gui-modules? #f
                settings
-               init-proc
-               kill-termination)
+               void
+               void)
               (drracket:language:make-text/pos text
                                                0
                                                (send text last-position))
@@ -276,7 +262,8 @@
                    (custodian-shutdown-all user-custodian)]
                   [else
                    (displayln sexp)
-                   (set! not-expanded-program sexp)
+                   ;(set! not-expanded-program sexp)
+                   (syntax-refactoring sexp text start-selection end-selection start-line end-line)
                    (displayln not-expanded-program)
                    (loop)])) 
               #t)))
@@ -293,7 +280,7 @@
           
           
           (displayln "before refactoring")
-          (syntax-refactoring text start-selection end-selection start-line end-line))
+          #;(syntax-refactoring text start-selection end-selection start-line end-line))
         
         (let ((btn
                (new switchable-button%
@@ -324,7 +311,7 @@
     
     
     
-    (define (syntax-refactoring text start-selection end-selection start-line end-line)
+    (define (syntax-refactoring not-expanded-program text start-selection end-selection start-line end-line)
       (define arg null)
       ;; syntax says it's line 2 when here it says 0. adjustment is start-line +2 and end-line +2.
       (define (write-back aux-stx)
@@ -335,7 +322,7 @@
           (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
           (displayln (pretty-format (syntax->datum aux-stx)))))
       
-      (syntax-parse (code-walker expanded-program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program
+      #;(syntax-parse (code-walker expanded-program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program
           #:literals(if)
           [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
            (when (equal? (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
