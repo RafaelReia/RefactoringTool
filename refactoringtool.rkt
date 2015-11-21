@@ -73,14 +73,14 @@
           (define user-custodian #f)
           
           (define normal-termination? #f)
-         
+          
           (define show-error-report/tab
             (void)
             #;(λ () ; =drs=
-              #;(send the-tab turn-on-error-report)
-              #;(send (send the-tab get-error-report-text) scroll-to-position 0)
-              #;(when (eq? (get-current-tab) the-tab)
-                  (show-error-report))))
+                #;(send the-tab turn-on-error-report)
+                #;(send (send the-tab get-error-report-text) scroll-to-position 0)
+                #;(when (eq? (get-current-tab) the-tab)
+                    (show-error-report))))
           (define cleanup
             (λ () ; =drs=
               (send the-tab set-breakables old-break-thread old-custodian)
@@ -90,13 +90,13 @@
               
               ;; do this with some lag ... not great, but should be okay.
               #;(let ([err-port (send (send the-tab get-error-report-text) get-err-port)])
-                (thread
-                 (λ ()
-                   (flush-output err-port)
-                   (queue-callback
-                    (λ ()
-                      (unless (= 0 (send (send the-tab get-error-report-text) last-position))
-                        (show-error-report/tab)))))))))
+                  (thread
+                   (λ ()
+                     (flush-output err-port)
+                     (queue-callback
+                      (λ ()
+                        (unless (= 0 (send (send the-tab get-error-report-text) last-position))
+                          (show-error-report/tab)))))))))
           (define kill-termination
             (λ ()
               (unless normal-termination?
@@ -147,29 +147,29 @@
               #;(current-error-port error-port)
               #;(current-output-port output-port)
               #;(error-display-handler 
-               (λ (msg exn) ;; =user=
-                 (parameterize ([current-eventspace drs-eventspace])
-                   #;(queue-callback
-                    (λ () ;; =drs=
-                      
-                      ;; this has to come first or else the positioning
-                      ;; computations in the highlight-errors/exn method
-                      ;; will be wrong by the size of the error report box
-                      (show-error-report/tab)
-                      
-                      ;; a call like this one also happens in 
-                      ;; drracket:debug:error-display-handler/stacktrace
-                      ;; but that call won't happen here, because
-                      ;; the rep is not in the current-rep parameter
-                      (send interactions-text highlight-errors/exn exn))))
-                 
-                 (drracket:debug:error-display-handler/stacktrace 
-                  msg 
-                  exn 
-                  '()
-                  #:definitions-text definitions-text)
-                 
-                 (semaphore-post error-display-semaphore)))
+                 (λ (msg exn) ;; =user=
+                   (parameterize ([current-eventspace drs-eventspace])
+                     #;(queue-callback
+                        (λ () ;; =drs=
+                          
+                          ;; this has to come first or else the positioning
+                          ;; computations in the highlight-errors/exn method
+                          ;; will be wrong by the size of the error report box
+                          (show-error-report/tab)
+                          
+                          ;; a call like this one also happens in 
+                          ;; drracket:debug:error-display-handler/stacktrace
+                          ;; but that call won't happen here, because
+                          ;; the rep is not in the current-rep parameter
+                          (send interactions-text highlight-errors/exn exn))))
+                   
+                   (drracket:debug:error-display-handler/stacktrace 
+                    msg 
+                    exn 
+                    '()
+                    #:definitions-text definitions-text)
+                   
+                   (semaphore-post error-display-semaphore)))
               
               (error-print-source-location #f) ; need to build code to render error first
               (uncaught-exception-handler
@@ -188,10 +188,9 @@
           (define module-language?
             (is-a? (drracket:language-configuration:language-settings-language settings)
                    drracket:module-language:module-language<%>))
-          #;(begin
-            ;with-lock/edit-sequence
-           ;text
-           ((λ ()
+          (with-lock/edit-sequence
+           text
+           (λ ()
              (drracket:eval:expand-program
               #:gui-modules? #f
               (drracket:language:make-text/pos text
@@ -226,10 +225,8 @@
                      ;(update-status-line 'drracket:check-syntax:status status-eval-compile-time)
                      (eval-compile-time-part-of-top-level sexp))
                    (parameterize ([current-eventspace drs-eventspace])
-                     (begin 
-                       ;queue-callback
-                      (begin
-                        ;λ () ; =drs=
+                     (queue-callback
+                      (λ () ; =drs=
                         (with-lock/edit-sequence
                          definitions-text
                          (λ ()
@@ -241,12 +238,13 @@
                                ;(displayln "TEST")
                                #;(print-syntax-width 1000) 
                                #;(displayln sexp) ;;;; FOUND IT!
-                               (set! expanded-program sexp)
+                               ;(set! expanded-program sexp)
+                               (syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
                                (expanded-expression sexp)))
                            #;(close-status-line 'drracket:check-syntax:status))))))
                    ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
                    ;(close-status-line 'drracket:check-syntax:status)
-                   (loop)]))))))
+                   (loop)])))))
           ((λ ()
              ((drracket:eval:traverse-program/multiple
                #:gui-modules? #f
@@ -263,7 +261,7 @@
                   [else
                    (displayln sexp)
                    ;(set! not-expanded-program sexp)
-                   (syntax-refactoring sexp text start-selection end-selection start-line end-line)
+                   ;(syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
                    (displayln not-expanded-program)
                    (loop)])) 
               #t)))
@@ -311,7 +309,7 @@
     
     
     
-    (define (syntax-refactoring not-expanded-program text start-selection end-selection start-line end-line)
+    (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line)
       (define arg null)
       ;; syntax says it's line 2 when here it says 0. adjustment is start-line +2 and end-line +2.
       (define (write-back aux-stx)
@@ -321,19 +319,21 @@
           (send text delete start-selection end-selection)
           (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
           (displayln (pretty-format (syntax->datum aux-stx)))))
-      
-      #;(syntax-parse (code-walker expanded-program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program
-          #:literals(if)
-          [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
-           (when (equal? (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
-             (write-back #'(not test-expr)))])
-      (set! arg (code-walker-non-expanded not-expanded-program (+ 1 start-line) (+ 1 end-line)))
-      (displayln arg)
-      (syntax-parse arg
-        ;#:literals ((if if #:phase 2))
-        ;#:datum-literals (if)
-        #:datum-literals (if)
-        [(if test-expr then-expr else-expr) (write-back #'(not test-expr))]))  
+      (if expanded?
+          (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program
+            #:literals(if)
+            [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
+             (write-back #'(not test-expr))
+             #;(when (equal? (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
+                 (write-back #'(not test-expr)))])
+          (begin
+            (set! arg (code-walker-non-expanded program (+ 1 start-line) (+ 1 end-line)))
+            (displayln arg)
+            (syntax-parse arg
+              ;#:literals ((if if #:phase 2))
+              ;#:datum-literals (if)
+              #:datum-literals (if)
+              [(if test-expr then-expr else-expr) (write-back #'(not test-expr))]))))  
     (define (phase1) (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
