@@ -58,9 +58,6 @@
         (define current-syncheck-running-mode #f)
         
         (define (refactoring-syntax text tab interactions #:print-extra-info? [print-extra-info? #f])
-          #;(open-status-line 'drracket:check-syntax:status) ;status line is inherith from somewhere and ensure-rep-hidden
-          #;(update-status-line 'drracket:check-syntax:status status-init)
-          #;(ensure-rep-hidden)
           (define definitions-text text)
           (define interactions-text interactions)
           (define drs-eventspace (current-eventspace))
@@ -201,8 +198,6 @@
               init-proc
               kill-termination
               (λ (sexp loop) ; =user=
-                ;(displayln "[Test] Sexp is that right? ") Program Already expanded....
-                ;(displayln sexp)
                 (cond
                   [(eof-object? sexp)
                    (set! normal-termination? #t)
@@ -218,11 +213,7 @@
                         (cleanup)
                         (custodian-shutdown-all user-custodian))))]
                   [else
-                   ;(open-status-line 'drracket:check-syntax:status)
-                   ;(displayln "Sexp is that right? ")
-                   ;(displayln sexp)
                    (unless module-language?
-                     ;(update-status-line 'drracket:check-syntax:status status-eval-compile-time)
                      (eval-compile-time-part-of-top-level sexp))
                    (parameterize ([current-eventspace drs-eventspace])
                      (queue-callback
@@ -230,15 +221,10 @@
                         (with-lock/edit-sequence
                          definitions-text
                          (λ ()
-                           ;(open-status-line 'drracket:check-syntax:status)
                            #;(update-status-line 
                               'drracket:check-syntax:status status-coloring-program)
                            (parameterize ([current-annotations definitions-text])
                              (begin
-                               ;(displayln "TEST")
-                               #;(print-syntax-width 1000) 
-                               #;(displayln sexp) ;;;; FOUND IT!
-                               ;(set! expanded-program sexp)
                                (syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
                                (expanded-expression sexp)))
                            #;(close-status-line 'drracket:check-syntax:status))))))
@@ -274,9 +260,6 @@
           (send text position-location end-selection #f end-box #t #f #f);Check this!
           (define start-line (send text find-line (unbox start-box)))
           (define end-line (send text find-line (unbox end-box)))
-          
-          
-          
           (displayln "before refactoring")
           #;(syntax-refactoring text start-selection end-selection start-line end-line))
         
@@ -288,13 +271,26 @@
                                  (get-definitions-text)(get-current-tab) (get-interactions-text))))
                     
                     (parent (get-button-panel))
-                    (bitmap reverse-content-bitmap))))
+                    (bitmap refactoring-bitmap))))
           (register-toolbar-button btn #:number 11)
+          (send (get-button-panel) change-children
+                (λ (l)
+                  (cons btn (remq btn l)))))
+        (let ((btn
+               (new switchable-button%
+                    (label "Refactoring If V2")
+                    (callback (λ (button)
+                                (refactoring-syntax
+                                 (get-definitions-text)(get-current-tab) (get-interactions-text))))
+                    
+                    (parent (get-button-panel))
+                    (bitmap refactoring-bitmap))))
+          (register-toolbar-button btn #:number 12)
           (send (get-button-panel) change-children
                 (λ (l)
                   (cons btn (remq btn l)))))))
     
-    (define reverse-content-bitmap
+    (define refactoring-bitmap
       (let* ((bmp (make-bitmap 16 16))
              (bdc (make-object bitmap-dc% bmp)))
         (send bdc erase)
@@ -307,6 +303,18 @@
         (send bdc set-bitmap #f)
         bmp))
     
+    (define refactoring-bitmap-expanded
+      (let* ((bmp (make-bitmap 16 16))
+             (bdc (make-object bitmap-dc% bmp)))
+        (send bdc erase)
+        (send bdc set-smoothing 'smoothed)
+        (send bdc set-pen "black" 1 'transparent)
+        (send bdc set-brush "red" 'solid)
+        (send bdc draw-ellipse 2 2 8 8)
+        (send bdc set-brush "blue" 'solid)
+        (send bdc draw-ellipse 6 6 8 8)
+        (send bdc set-bitmap #f)
+        bmp))
     
     
     (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line)
