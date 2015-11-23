@@ -58,7 +58,7 @@
         
         (define current-syncheck-running-mode #f)
         
-        (define (refactoring-syntax text tab interactions #:print-extra-info? [print-extra-info? #f])
+        (define (refactoring-syntax text tab interactions refactoring? #:print-extra-info? [print-extra-info? #f])
           (define definitions-text text)
           (define interactions-text interactions)
           (define drs-eventspace (current-eventspace))
@@ -198,79 +198,79 @@
           (define module-language?
             (is-a? (drracket:language-configuration:language-settings-language settings)
                    drracket:module-language:module-language<%>))
-          (with-lock/edit-sequence
-           text
-           (λ ()
-             (drracket:eval:expand-program
-              #:gui-modules? #f
-              (drracket:language:make-text/pos text
-                                               0
-                                               (send text last-position)) ;;Input
-              settings
-              #f;(not module-language?)
-              init-proc
-              kill-termination
-              (λ (sexp loop) ; =user=
-                (cond
-                  [(eof-object? sexp)
-                   (set! normal-termination? #t)
-                   (parameterize ([current-eventspace drs-eventspace])
-                     (queue-callback
-                      (λ () ; =drs=
-                        (with-lock/edit-sequence
-                         definitions-text
-                         (λ ()
-                           (parameterize ([current-annotations definitions-text])
-                             (begin
-                               (expansion-completed)))))
-                        (cleanup)
-                        (custodian-shutdown-all user-custodian))))]
-                  [else
-                   (unless module-language?
-                     (eval-compile-time-part-of-top-level sexp))
-                   (parameterize ([current-eventspace drs-eventspace])
-                     (queue-callback
-                      (λ () ; =drs=
-                        (with-lock/edit-sequence
-                         definitions-text
-                         (λ ()
-                           #;(update-status-line 
-                              'drracket:check-syntax:status status-coloring-program)
-                           (parameterize ([current-annotations definitions-text])
-                             (begin
-                               ;(syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
-                               (expanded-expression sexp)))
-                           #;(close-status-line 'drracket:check-syntax:status))))))
-                   ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
-                   ;(close-status-line 'drracket:check-syntax:status)
-                   (loop)])))))
-          ((λ ()
-             ((drracket:eval:traverse-program/multiple
-               #:gui-modules? #f
-               settings
-               void
-               void)
-              (drracket:language:make-text/pos text
-                                               0
-                                               (send text last-position))
-              (λ (sexp loop) ;this is the "iter"
-                (cond
-                  [(eof-object? sexp)
-                   (custodian-shutdown-all user-custodian)]
-                  [else
-                   (displayln sexp)
-                   ;(set! not-expanded-program sexp)
-                   (syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
-                   (displayln not-expanded-program)
-                   (loop)])) 
-              #t))))
+          (if refactoring?
+              (with-lock/edit-sequence
+               text
+               (λ ()
+                 (drracket:eval:expand-program
+                  #:gui-modules? #f
+                  (drracket:language:make-text/pos text
+                                                   0
+                                                   (send text last-position)) ;;Input
+                  settings
+                  #f;(not module-language?)
+                  init-proc
+                  kill-termination
+                  (λ (sexp loop) ; =user=
+                    (cond
+                      [(eof-object? sexp)
+                       (set! normal-termination? #t)
+                       (parameterize ([current-eventspace drs-eventspace])
+                         (queue-callback
+                          (λ () ; =drs=
+                            (with-lock/edit-sequence
+                             definitions-text
+                             (λ ()
+                               (parameterize ([current-annotations definitions-text])
+                                 (begin
+                                   (expansion-completed)))))
+                            (cleanup)
+                            (custodian-shutdown-all user-custodian))))]
+                      [else
+                       (unless module-language?
+                         (eval-compile-time-part-of-top-level sexp))
+                       (parameterize ([current-eventspace drs-eventspace])
+                         (queue-callback
+                          (λ () ; =drs=
+                            (with-lock/edit-sequence
+                             definitions-text
+                             (λ ()
+                               #;(update-status-line 
+                                  'drracket:check-syntax:status status-coloring-program)
+                               (parameterize ([current-annotations definitions-text])
+                                 (begin
+                                   (syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
+                                   (expanded-expression sexp)))
+                               #;(close-status-line 'drracket:check-syntax:status))))))
+                       ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
+                       ;(close-status-line 'drracket:check-syntax:status)
+                       (loop)])))))
+              ((λ ()
+                 ((drracket:eval:traverse-program/multiple
+                   #:gui-modules? #f
+                   settings
+                   init-proc
+                   kill-termination)
+                  (drracket:language:make-text/pos text
+                                                   0
+                                                   (send text last-position))
+                  (λ (sexp loop) ;this is the "iter"
+                    (cond
+                      [(eof-object? sexp)
+                       (custodian-shutdown-all user-custodian)]
+                      [else
+                       (displayln sexp)
+                       (syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
+                       (displayln not-expanded-program)
+                       (loop)])) 
+                  #t)))))
         
         (let ((btn
                (new switchable-button%
                     (label "Refactoring If")
                     (callback (λ (button)
                                 (refactoring-syntax
-                                 (get-definitions-text)(get-current-tab) (get-interactions-text))))
+                                 (get-definitions-text)(get-current-tab) (get-interactions-text) #t)))
                     
                     (parent (get-button-panel))
                     (bitmap refactoring-bitmap))))
@@ -283,7 +283,7 @@
                     (label "Refactoring If V2")
                     (callback (λ (button)
                                 (refactoring-syntax
-                                 (get-definitions-text)(get-current-tab) (get-interactions-text))))
+                                 (get-definitions-text)(get-current-tab) (get-interactions-text) #f)))
                     
                     (parent (get-button-panel))
                     (bitmap refactoring-bitmap))))
@@ -329,21 +329,23 @@
           (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
           (displayln (pretty-format (syntax->datum aux-stx)))))
       (if expanded?
-          (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program
+          (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program Regarding if
             #:literals(if)
             [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
-             (write-back #'(not test-expr))
-             #;(when (equal? (syntax->datum #'then-expr) (not (syntax->datum #'else-expr)))
-                 (write-back #'(not test-expr)))])
+             (when (and (not (eval-syntax #'then-expr)) (eval-syntax #'else-expr))
+               (write-back #'(not test-expr)))])
           (begin
+            ;;Regarding Refactoring if V2
             (set! arg (code-walker-non-expanded program (+ 1 start-line) (+ 1 end-line)))
             (displayln arg)
             (syntax-parse arg
               ;#:literals ((if if #:phase 2))
-              #:literals (if)
+              ;#:literals (if)
               ;#:literal-sets (xpto)
-              ;#:datum-literals (if) ;This works
-              [(if test-expr then-expr else-expr) (write-back #'(not test-expr))]))))  
+              #:datum-literals (if) ;This works
+              [(if test-expr then-expr else-expr) 
+               (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
+                 (write-back #'(not test-expr)))]))))  
     (define (phase1) (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
