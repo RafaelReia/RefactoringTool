@@ -1,23 +1,18 @@
 #lang racket/base
-(require syntax/parse)
 (provide code-walker
          code-walker-non-expanded);805 linhas inicio
 
-;;;;;;;;;;; Definitions ;;;;;;;;;;;;;;;;;;;
-(define start-line 0)
-(define end-line 0)
-;;;;;;;;;; END Definitions ;;;;;;;;;;;;;;;;
 (define (code-walker code start end) ;;for the expanded version
-  (set! start-line start)
-  (set! end-line end)
+  (define start-line start)
+  (define end-line end)
   (define aux (get-syntax-aux code start-line end-line))
   (parameterize ((print-syntax-width 9000))
     (displayln (cdr (syntax-e aux)))) ;;clean #%app
   (cdr (syntax-e aux)))
 
 (define (code-walker-non-expanded code start end)
-  (set! start-line start)
-  (set! end-line end)
+  (define start-line start)
+  (define end-line end)
   (displayln (syntax-e code))
   (displayln " NON EXPANDED")
   (define result (get-syntax-aux code start-line end-line))
@@ -54,10 +49,6 @@
           (set! aux (syntax-line (car (car source-stack))))
           (when (or (null? source-stack) (and (syntax? (car source-stack)) (null? (syntax-e (car source-stack)))))
             (set! aux -1)))
-      (display "Compare result: ")
-      (display aux)
-      (display " last line: ")
-      (displayln end)
       aux)
     (cond [(null? source-aux)
            (displayln "It's null")]
@@ -71,22 +62,11 @@
            (define compare-aux (syntax-line source-aux))
            (define next-compare null)
            (if (and (null? source-stack) (syntax? source-aux))
+                 (set! source-aux (syntax-e source-aux))
                (begin
-                 (parameterize ((print-syntax-width 9000))
-                   (displayln source-aux))
-                 ;(read)
-                 (set! source-aux (syntax-e source-aux)))
-               ;(set! source-stack (cdr source-stack))
-               ;(get-syntax (syntax-e source-aux) start end))
-               
-               (begin
-                 (parameterize ((print-syntax-width 9000))
-                   (displayln "begin source-aux")
-                   (displayln source-aux))
                  (set! next-compare (get-next-compare source-aux source-stack))
                  (cond [(and (real? next-compare) (< next-compare 0))
                         ;go deeper
-                        (displayln "-1")
                         (set! source-aux (syntax-e source-aux))] 
                        [(not (real? compare-aux)) 
                         ;next one
@@ -112,7 +92,6 @@
              (displayln source-stack))
            (get-syntax source-aux start end)]
           [else
-           (displayln "BIG ELSE REACHED")
            (set! source-aux (car source-stack))
            (set! source-stack (cdr source-stack))
            (get-syntax source-aux start end)]))

@@ -1,5 +1,5 @@
 #lang racket/base
-(require drracket/tool
+(require drracket/tool ;Bug, racket do not find the "binding" (paint that red) however it is needed)
          racket/class
          racket/gui/base
          racket/unit
@@ -10,6 +10,7 @@
          drracket/private/syncheck/syncheck-intf
          syntax/toplevel
          drracket/private/syncheck/traversals
+         (for-template racket/base)
          "code-walker.rkt")
 (provide tool@)
 (define not-expanded-program null)
@@ -63,6 +64,18 @@
           (define drs-eventspace (current-eventspace))
           (define the-tab (get-current-tab))
           (define-values (old-break-thread old-custodian) (send the-tab get-breakables))
+          
+          ;;;;;;;;;;;;;;;;;; Editor information
+          (define start-selection (send text get-start-position))
+          (define end-selection (send text get-end-position))
+          ;;find-line uses location, not position. must convert before!
+          (define start-box (box 1))
+          (define end-box (box 1))
+          (send text position-location start-selection #f start-box #t #f #f);Check this!
+          (send text position-location end-selection #f end-box #t #f #f);Check this!
+          (define start-line (send text find-line (unbox start-box)))
+          (define end-line (send text find-line (unbox end-box)))
+          ;;;;;;;;;;;;;;;;;;
           
           ;; set by the init-proc
           (define expanded-expression void)
@@ -225,7 +238,7 @@
                               'drracket:check-syntax:status status-coloring-program)
                            (parameterize ([current-annotations definitions-text])
                              (begin
-                               (syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
+                               ;(syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
                                (expanded-expression sexp)))
                            #;(close-status-line 'drracket:check-syntax:status))))))
                    ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
@@ -247,21 +260,10 @@
                   [else
                    (displayln sexp)
                    ;(set! not-expanded-program sexp)
-                   ;(syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
+                   (syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
                    (displayln not-expanded-program)
                    (loop)])) 
-              #t)))
-          (define start-selection (send text get-start-position))
-          (define end-selection (send text get-end-position))
-          ;;find-line uses location, not position. must convert before!
-          (define start-box (box 1))
-          (define end-box (box 1))
-          (send text position-location start-selection #f start-box #t #f #f);Check this!
-          (send text position-location end-selection #f end-box #t #f #f);Check this!
-          (define start-line (send text find-line (unbox start-box)))
-          (define end-line (send text find-line (unbox end-box)))
-          (displayln "before refactoring")
-          #;(syntax-refactoring text start-selection end-selection start-line end-line))
+              #t))))
         
         (let ((btn
                (new switchable-button%
@@ -319,7 +321,6 @@
     
     (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line)
       (define arg null)
-      ;; syntax says it's line 2 when here it says 0. adjustment is start-line +2 and end-line +2.
       (define (write-back aux-stx)
         (displayln "WRINTING")
         (parameterize ((print-as-expression #f)
@@ -339,9 +340,14 @@
             (displayln arg)
             (syntax-parse arg
               ;#:literals ((if if #:phase 2))
-              ;#:datum-literals (if)
-              #:datum-literals (if)
+              #:literals (if)
+              ;#:literal-sets (xpto)
+              ;#:datum-literals (if) ;This works
               [(if test-expr then-expr else-expr) (write-back #'(not test-expr))]))))  
     (define (phase1) (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
+
+
+(define-literal-set xpto
+  (if))
