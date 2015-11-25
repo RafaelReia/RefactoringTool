@@ -340,9 +340,9 @@
             (displayln arg)
             (syntax-parse arg
               ;#:literals ((if if #:phase 2))
-              ;#:literals (if)
+              #:literals (if)
               ;#:literal-sets (xpto)
-              #:datum-literals (if) ;This works
+              ;#:datum-literals (if) ;This works
               [(if test-expr then-expr else-expr) 
                (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
                  (write-back #'(not test-expr)))]))))  
