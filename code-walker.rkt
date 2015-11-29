@@ -85,6 +85,7 @@
                         (set! stop? #t)
                         (set! aux-result source-aux)]
                        [else
+                        (read)
                         (displayln "weird else")])))
            #;(parameterize ((print-syntax-width 9000))
              (displayln "In Syntax before leaving")

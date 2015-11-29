@@ -28,7 +28,6 @@
                  get-current-tab
                  get-interactions-text)
         (inherit register-toolbar-button)
-        
         (define (set-syncheck-running-mode mode)
           (cond
             [(not mode)
@@ -68,13 +67,22 @@
           ;;;;;;;;;;;;;;;;;; Editor information
           (define start-selection (send text get-start-position))
           (define end-selection (send text get-end-position))
+          (define last-line (send text last-line))
+          (displayln last-line)
           ;;find-line uses location, not position. must convert before!
           (define start-box (box 1))
           (define end-box (box 1))
+          (define last-box (box 1))
           (send text position-location start-selection #f start-box #t #f #f);Check this!
           (send text position-location end-selection #f end-box #t #f #f);Check this!
+          (send text position-location last-line #f last-box #t #f #f) ;Trying
+          (displayln last-box)
+          (displayln (send text position-line last-line))
           (define start-line (send text find-line (unbox start-box)))
           (define end-line (send text find-line (unbox end-box)))
+          (define last-line-pos (send text find-line (unbox last-box)))
+          (displayln last-line-pos)
+          (displayln end-line)
           ;;;;;;;;;;;;;;;;;;
           
           ;; set by the init-proc
@@ -239,7 +247,7 @@
                                   'drracket:check-syntax:status status-coloring-program)
                                (parameterize ([current-annotations definitions-text])
                                  (begin
-                                   (syntax-refactoring sexp #t text start-selection end-selection start-line end-line)
+                                   (syntax-refactoring sexp #t text start-selection end-selection start-line end-line last-line)
                                    (expanded-expression sexp)))
                                #;(close-status-line 'drracket:check-syntax:status))))))
                        ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
@@ -260,11 +268,13 @@
                        (custodian-shutdown-all user-custodian)]
                       [else
                        (displayln sexp)
-                       (syntax-refactoring sexp #f text start-selection end-selection start-line end-line)
+                       (syntax-refactoring sexp #f text start-selection end-selection start-line end-line last-line)
                        (displayln not-expanded-program)
                        (loop)])) 
                   #t)))))
         
+        (define/public (refactoring-syntax-aux bool)
+          (refactoring-syntax (get-definitions-text) (get-current-tab) (get-interactions-text) bool))
         (let ((btn
                (new switchable-button%
                     (label "Refactoring If")
@@ -319,7 +329,7 @@
         bmp))
     
     
-    (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line)
+    (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line last-line)
       (define arg null)
       (define (write-back aux-stx)
         (displayln "WRINTING")
@@ -328,25 +338,100 @@
           (send text delete start-selection end-selection)
           (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
           (displayln (pretty-format (syntax->datum aux-stx)))))
-      (if expanded?
-          (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program Regarding if
-            #:literals(if)
-            [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
-             (when (and (not (eval-syntax #'then-expr)) (eval-syntax #'else-expr))
-               (write-back #'(not test-expr)))])
+      (define (search-refactorings start)
+        (displayln start)
+        (displayln last-line)
+        (define aux (code-walker-non-expanded program (+ 1 start) (+ 1 last-line)))
+        
+        ;;;test refactorings
+        
+        (syntax-parse aux
+          ;#:literals ((if if #:phase 2))
+          ;#:literals (if)
+          ;#:literal-sets (xpto)
+          #:datum-literals (if) ;This works
+          [(if test-expr then-expr else-expr) 
+           (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
+             (send text highlight-range (syntax-position aux) (+ 5 (syntax-position aux)) (make-object color% 255 0 0 1.0)))]
+          [_ 'ok])
+        #;(send text unhighlight-range start end color [caret-space style])
+        ;;;;; highlight/display (end start color)
+        #;(send text highlight-range 1 5 (make-object color% 255 0 0 1.0))
+        
+        (displayln "loop")
+        (displayln aux)
+        (+ 1 start))
+      (displayln start-line)
+      (displayln end-line)
+      (if (not (= start-line end-line))
+          (if expanded?
+              (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program Regarding if
+                #:literals(if)
+                [(call-with-values (lambda () (if test-expr then-expr else-expr)) print-values) 
+                 (when (and (not (eval-syntax #'then-expr)) (eval-syntax #'else-expr))
+                   (write-back #'(not test-expr)))])
+              (begin
+                ;;Regarding Refactoring if V2
+                (set! arg (code-walker-non-expanded program (+ 1 start-line) (+ 1 end-line)))
+                (displayln arg)
+                (syntax-parse arg
+                  ;#:literals ((if if #:phase 2))
+                  ;#:literals (if)
+                  ;#:literal-sets (xpto)
+                  #:datum-literals (if) ;This works
+                  [(if test-expr then-expr else-expr) 
+                   (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
+                     (write-back #'(not test-expr)))])))
           (begin
-            ;;Regarding Refactoring if V2
-            (set! arg (code-walker-non-expanded program (+ 1 start-line) (+ 1 end-line)))
-            (displayln arg)
-            (syntax-parse arg
-              ;#:literals ((if if #:phase 2))
-              #:literals (if)
-              ;#:literal-sets (xpto)
-              ;#:datum-literals (if) ;This works
-              [(if test-expr then-expr else-expr) 
-               (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
-                 (write-back #'(not test-expr)))]))))  
-    (define (phase1) (void))
+            (let loop ([start start-line]
+                       [end last-line])
+              (define aux (search-refactorings start))
+              (if (= start end)
+                  (displayln "Over")
+                  (loop aux end))))))  
+    (define (phase1) 
+      (define (create-refactoring-menu menu bool)
+        #;(define aux-mixin (refactoring-tool-mixin drracket:unit:frame<%>))
+        (define refactoring-menu
+          (make-object menu%
+            "Refactoring Test Plugin"
+            menu))
+        (make-object menu-item%
+          ;(get-refactoring-string)
+          "Refactoring If"
+          refactoring-menu
+          (λ (item evt)
+            #;(void)
+            (send refactoring-tool-mixin refactoring-syntax-aux #t)))
+        (make-object menu-item%
+          ;(get-refactoring-string)
+          "Refactoring If V2"
+          refactoring-menu
+          (λ (item evt)
+            #;(void)
+            (send refactoring-tool-mixin refactoring-syntax #f)))
+        (void)
+        #;(displayln "testing stuff"))
+      (keymap:add-to-right-button-menu/before
+       (let ([old (keymap:add-to-right-button-menu/before)])
+         (λ (menu editor event)
+           (old menu editor event)
+           (create-refactoring-menu menu #f))))
+      (drracket:module-language-tools:add-opt-out-toolbar-button
+       (λ (frame parent)
+         (define btn (new switchable-button%
+                          (label "Test")
+                          ;(bitmap (create-bitmap state))
+                          (bitmap refactoring-bitmap-expanded)
+                          (parent parent)
+                          (callback (λ (button)
+                                      (send frame autorun:button-callback btn)))))
+         
+         (define refactoring-test (new menu% [label "Refactoring Test"] [parent (send frame get-menu-bar)]))
+         (append-editor-operation-menu-items refactoring-test #t)
+         btn)
+       'auto-run
+       #:number 11))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
 
