@@ -10,7 +10,8 @@
          drracket/private/syncheck/syncheck-intf
          syntax/toplevel
          drracket/private/syncheck/traversals
-         (for-template racket/base)
+         (for-template racket/base) ;was a test, did not work
+         syntax/to-string
          "code-walker.rkt")
 (provide tool@)
 (define not-expanded-program null)
@@ -155,8 +156,6 @@
                    (define/override (get-port-name)
                      (send definitions-text get-port-name))
                    (super-new))))
-          #;(define cleanup
-              (void))
           (define init-proc
             (λ () ; =user=
               (send the-tab set-breakables (current-thread) (current-custodian))
@@ -250,8 +249,6 @@
                                    (syntax-refactoring sexp #t text start-selection end-selection start-line end-line last-line)
                                    (expanded-expression sexp)))
                                #;(close-status-line 'drracket:check-syntax:status))))))
-                       ;(update-status-line 'drracket:check-syntax:status status-expanding-expression)
-                       ;(close-status-line 'drracket:check-syntax:status)
                        (loop)])))))
               ((λ ()
                  ((drracket:eval:traverse-program/multiple
@@ -272,98 +269,37 @@
                        (displayln not-expanded-program)
                        (loop)])) 
                   #t)))))
-        
-        (define/public (refactoring-syntax-aux bool)
-          (refactoring-syntax (get-definitions-text) (get-current-tab) (get-interactions-text) bool))
-        (let ((btn
-               (new switchable-button%
-                    (label "Refactoring If")
-                    (callback (λ (button)
-                                (refactoring-syntax
-                                 (get-definitions-text)(get-current-tab) (get-interactions-text) #t)))
-                    
-                    (parent (get-button-panel))
-                    (bitmap refactoring-bitmap))))
-          (register-toolbar-button btn #:number 11)
-          (send (get-button-panel) change-children
-                (λ (l)
-                  (cons btn (remq btn l)))))
-        (let ((btn
-               (new switchable-button%
-                    (label "Refactoring If V2")
-                    (callback (λ (button)
-                                (refactoring-syntax
-                                 (get-definitions-text)(get-current-tab) (get-interactions-text) #f)))
-                    
-                    (parent (get-button-panel))
-                    (bitmap refactoring-bitmap))))
-          (register-toolbar-button btn #:number 12)
-          (send (get-button-panel) change-children
-                (λ (l)
-                  (cons btn (remq btn l)))))))
-    
-    (define refactoring-bitmap
-      (let* ((bmp (make-bitmap 16 16))
-             (bdc (make-object bitmap-dc% bmp)))
-        (send bdc erase)
-        (send bdc set-smoothing 'smoothed)
-        (send bdc set-pen "black" 1 'transparent)
-        (send bdc set-brush "blue" 'solid)
-        (send bdc draw-ellipse 2 2 8 8)
-        (send bdc set-brush "red" 'solid)
-        (send bdc draw-ellipse 6 6 8 8)
-        (send bdc set-bitmap #f)
-        bmp))
-    
-    (define refactoring-bitmap-expanded
-      (let* ((bmp (make-bitmap 16 16))
-             (bdc (make-object bitmap-dc% bmp)))
-        (send bdc erase)
-        (send bdc set-smoothing 'smoothed)
-        (send bdc set-pen "black" 1 'transparent)
-        (send bdc set-brush "red" 'solid)
-        (send bdc draw-ellipse 2 2 8 8)
-        (send bdc set-brush "blue" 'solid)
-        (send bdc draw-ellipse 6 6 8 8)
-        (send bdc set-bitmap #f)
-        bmp))
-    
-    
-    (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line last-line)
+        (define (create-refactoring-menu menu bool)
+          (define refactoring-menu
+            (make-object menu%
+              "Refactoring Test Plugin"
+              menu))
+          (make-object menu-item%
+            ;(get-refactoring-string)
+            "Refactoring If"
+            refactoring-menu
+            (λ (item evt)
+              (refactoring-syntax (get-definitions-text) (get-current-tab) (get-interactions-text) #t)))
+          (make-object menu-item%
+            "Refactoring If V2"
+            refactoring-menu
+            (λ (item evt)
+              (refactoring-syntax (get-definitions-text) (get-current-tab) (get-interactions-text) #f)))
+          (void))
+        (keymap:add-to-right-button-menu/before
+         (let ([old (keymap:add-to-right-button-menu/before)])
+           (λ (menu editor event)
+             (old menu editor event)
+             (create-refactoring-menu menu #f))))))  
+    (define (syntax-refactoring program expanded? text start-selection end-selection start-line end-line last-line )
       (define arg null)
       (define (write-back aux-stx)
-        (displayln "WRINTING")
         (parameterize ((print-as-expression #f)
                        (pretty-print-columns 80))
           (send text delete start-selection end-selection)
           (send text insert (pretty-format (syntax->datum aux-stx)) start-selection 'same)
           (displayln (pretty-format (syntax->datum aux-stx)))))
-      (define (search-refactorings start)
-        (displayln start)
-        (displayln last-line)
-        (define aux (code-walker-non-expanded program (+ 1 start) (+ 1 last-line)))
-        
-        ;;;test refactorings
-        
-        (syntax-parse aux
-          ;#:literals ((if if #:phase 2))
-          ;#:literals (if)
-          ;#:literal-sets (xpto)
-          #:datum-literals (if) ;This works
-          [(if test-expr then-expr else-expr) 
-           (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
-             (send text highlight-range (syntax-position aux) (+ 5 (syntax-position aux)) (make-object color% 255 0 0 1.0)))]
-          [_ 'ok])
-        #;(send text unhighlight-range start end color [caret-space style])
-        ;;;;; highlight/display (end start color)
-        #;(send text highlight-range 1 5 (make-object color% 255 0 0 1.0))
-        
-        (displayln "loop")
-        (displayln aux)
-        (+ 1 start))
-      (displayln start-line)
-      (displayln end-line)
-      (if (not (= start-line end-line))
+      (unless (= start-line end-line)
           (if expanded?
               (syntax-parse (code-walker program (+ 1 start-line) (+ 1 end-line)) ;used for the exapanded program Regarding if
                 #:literals(if)
@@ -381,60 +317,8 @@
                   #:datum-literals (if) ;This works
                   [(if test-expr then-expr else-expr) 
                    (when (and (not (syntax->datum #'then-expr)) (syntax->datum #'else-expr))
-                     (write-back #'(not test-expr)))])))
-          (begin
-            (let loop ([start start-line]
-                       [end last-line])
-              (define aux (search-refactorings start))
-              (if (= start end)
-                  (displayln "Over")
-                  (loop aux end))))))  
+                     (write-back #'(not test-expr)))])))))
     (define (phase1) 
-      (define (create-refactoring-menu menu bool)
-        #;(define aux-mixin (refactoring-tool-mixin drracket:unit:frame<%>))
-        (define refactoring-menu
-          (make-object menu%
-            "Refactoring Test Plugin"
-            menu))
-        (make-object menu-item%
-          ;(get-refactoring-string)
-          "Refactoring If"
-          refactoring-menu
-          (λ (item evt)
-            #;(void)
-            (send refactoring-tool-mixin refactoring-syntax-aux #t)))
-        (make-object menu-item%
-          ;(get-refactoring-string)
-          "Refactoring If V2"
-          refactoring-menu
-          (λ (item evt)
-            #;(void)
-            (send refactoring-tool-mixin refactoring-syntax #f)))
-        (void)
-        #;(displayln "testing stuff"))
-      (keymap:add-to-right-button-menu/before
-       (let ([old (keymap:add-to-right-button-menu/before)])
-         (λ (menu editor event)
-           (old menu editor event)
-           (create-refactoring-menu menu #f))))
-      (drracket:module-language-tools:add-opt-out-toolbar-button
-       (λ (frame parent)
-         (define btn (new switchable-button%
-                          (label "Test")
-                          ;(bitmap (create-bitmap state))
-                          (bitmap refactoring-bitmap-expanded)
-                          (parent parent)
-                          (callback (λ (button)
-                                      (send frame autorun:button-callback btn)))))
-         
-         (define refactoring-test (new menu% [label "Refactoring Test"] [parent (send frame get-menu-bar)]))
-         (append-editor-operation-menu-items refactoring-test #t)
-         btn)
-       'auto-run
-       #:number 11))
+      (void))
     (define (phase2) (void))
     (drracket:get/extend:extend-unit-frame refactoring-tool-mixin)))
-
-
-(define-literal-set xpto
-  (if))
